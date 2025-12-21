@@ -1,0 +1,82 @@
+@background-color: #f1f2f3;
+
+@header-background-color: #2E86C1;
+
+@tabber-icon-active-color: #09BB07;
+
+/* Color scheme for buttons (Requirements: 8.5, 8.7) */
+@primary-color: #2E86C1;
+@primary-hover: #1A5276;
+@secondary-color: #6C757D;
+@secondary-hover: #545B62;
+@success-color: #229954;
+@success-hover: #1E8449;
+@danger-color: #E74C3C;
+@danger-hover: #C0392B;
+@warning-color: #F39C12;
+@warning-hover: #D68910;
+
+/* Button base styles */
+.btn-base {
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+/* Primary button */
+.btn-primary {
+  .btn-base();
+  background: linear-gradient(135deg, @primary-color 0%, @primary-hover 100%);
+  color: white;
+  
+  &:hover {
+    background: linear-gradient(135deg, @primary-hover 0%, darken(@primary-hover, 5%) 100%);
+    box-shadow: 0 4px 12px rgba(46, 134, 193, 0.3);
+  }
+}
+
+/* Secondary button */
+.btn-secondary {
+  .btn-base();
+  background: linear-gradient(135deg, @secondary-color 0%, @secondary-hover 100%);
+  color: white;
+  
+  &:hover {
+    background: linear-gradient(135deg, @secondary-hover 0%, darken(@secondary-hover, 5%) 100%);
+    box-shadow: 0 4px 12px rgba(108, 117, 125, 0.3);
+  }
+}
+
+/* Success button */
+.btn-success {
+  .btn-base();
+  background: linear-gradient(135deg, @success-color 0%, @success-hover 100%);
+  color: white;
+  
+  &:hover {
+    background: linear-gradient(135deg, @success-hover 0%, darken(@success-hover, 5%) 100%);
+    box-shadow: 0 4px 12px rgba(34, 153, 84, 0.3);
+  }
+}
+
+/* Danger button */
+.btn-danger {
+  .btn-base();
+  background: linear-gradient(135deg, @danger-color 0%, @danger-hover 100%);
+  color: white;
+  
+  &:hover {
+    background: linear-gradient(135deg, @danger-hover 0%, darken(@danger-hover, 5%) 100%);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.3);
+  }
+}

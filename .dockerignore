@@ -1,0 +1,44 @@
+# Dependencies - will be installed fresh during build
+node_modules
+
+# Git files
+.git
+.gitignore
+
+# Build output - will be built fresh during build
+dist
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+tests
+*.test.js
+*.spec.js
+coverage
+
+# Documentation
+*.md
+!README.md
+
+# Development files
+.env.local
+.env.development
+.env.test
+
+# Logs
+*.log
+npm-debug.log*
+
+# Docker files (not needed inside container)
+Dockerfile
+docker-compose.yml
+.dockerignore
