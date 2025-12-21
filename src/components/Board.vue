@@ -394,6 +394,9 @@ function drawMobileConfirmButtons(ctx, style, cs, pendingMove, canvasWidth, canv
     cancel: { x: cancelX, y: buttonY, radius: buttonSize/2 }
   }
 }
+
+// 绘制悬停预览棋子（半透明）
+function drawHoverPiece(ctx, style, cs, pos, isBlack) {
   if (!pos) return
   let radius = style.pieceScale / 2
   ctx.save()
