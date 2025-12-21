@@ -151,24 +151,8 @@ export default {
       })
 
       window.addEventListener('beforeinstallprompt', (e) => {
-        if (!canShowInstallPrompt()) {
-          return;
-        }
-
+        // 阻止默认的安装提示，不显示任何弹窗
         e.preventDefault();
-        const deferredPrompt = e;
-
-        _this.$vux.confirm.show_i18n({
-          title: _this.$t('install.title'),
-          content: _this.$t('install.msg'),
-          onConfirm() {
-            updateInstallPromptData();
-            deferredPrompt.prompt();
-          },
-          onCancel() {
-            updateInstallPromptData();
-          }
-        });
       });
     } else {
       if (this.configIndex == 0)

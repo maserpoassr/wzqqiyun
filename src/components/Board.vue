@@ -4,7 +4,14 @@
       <canvas id="board" ref="canvasBoard" :width="renderWidth" :height="renderHeight"></canvas>
       <canvas id="piece" ref="canvasPiece" :width="renderWidth" :height="renderHeight"></canvas>
       <canvas id="realtime" ref="canvasRealtime" class="needsclick" :width="renderWidth" :height="renderHeight"
-        @contextmenu.prevent @mousedown="onMouseDown" @touchstart="onMouseDown"></canvas>
+        @contextmenu.prevent 
+        @mousedown="onMouseDown" 
+        @touchstart.prevent="onMouseDown"
+        @mousemove="onMouseMove"
+        @touchmove.prevent="onMouseMove"
+        @mouseup="onMouseUp"
+        @touchend.prevent="onMouseUp"
+        @mouseleave="onMouseLeave"></canvas>
       <canvas id="shot" ref="canvasJpg" :width="2048" :height="(2048 * canvasHeight) / canvasWidth"></canvas>
       <canvas id="shot" ref="canvasGif" :width="1024" :height="(1024 * canvasHeight) / canvasWidth"></canvas>
     </div>
@@ -315,8 +322,78 @@ function drawForbid(ctx, style, cs, forbid) {
   ctx.restore()
 }
 
-// 绘制悬停预览棋子（半透明）
-function drawHoverPiece(ctx, style, cs, pos, isBlack) {
+// 绘制手机端确认按钮
+function drawMobileConfirmButtons(ctx, style, cs, pendingMove, canvasWidth, canvasHeight) {
+  if (!pendingMove) return
+  
+  ctx.save()
+  
+  // 计算按钮位置
+  const buttonSize = Math.min(cs * 0.8, 40)
+  const buttonSpacing = buttonSize * 0.3
+  const pieceX = paddingX + cs / 2 + pendingMove.x * cs
+  const pieceY = paddingTop + cs / 2 + pendingMove.y * cs
+  
+  // 确保按钮在画布内
+  let confirmX = pieceX + cs * 0.8
+  let cancelX = pieceX - cs * 0.8
+  let buttonY = pieceY
+  
+  // 边界检查和调整
+  if (confirmX + buttonSize > canvasWidth - 10) {
+    confirmX = pieceX - cs * 0.8
+    cancelX = pieceX - cs * 1.6
+  }
+  if (cancelX < 10) {
+    cancelX = pieceX + cs * 0.8
+    confirmX = pieceX + cs * 1.6
+  }
+  if (buttonY - buttonSize/2 < 10) {
+    buttonY = pieceY + cs * 0.8
+  }
+  if (buttonY + buttonSize/2 > canvasHeight - 10) {
+    buttonY = pieceY - cs * 0.8
+  }
+  
+  // 绘制确认按钮 (✓)
+  ctx.fillStyle = 'rgba(76, 175, 80, 0.9)'
+  ctx.beginPath()
+  ctx.arc(confirmX, buttonY, buttonSize/2, 0, Math.PI * 2)
+  ctx.fill()
+  
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(confirmX - buttonSize*0.2, buttonY)
+  ctx.lineTo(confirmX - buttonSize*0.05, buttonY + buttonSize*0.15)
+  ctx.lineTo(confirmX + buttonSize*0.2, buttonY - buttonSize*0.15)
+  ctx.stroke()
+  
+  // 绘制取消按钮 (✗)
+  ctx.fillStyle = 'rgba(244, 67, 54, 0.9)'
+  ctx.beginPath()
+  ctx.arc(cancelX, buttonY, buttonSize/2, 0, Math.PI * 2)
+  ctx.fill()
+  
+  ctx.strokeStyle = '#ffffff'
+  ctx.lineWidth = 3
+  ctx.lineCap = 'round'
+  ctx.beginPath()
+  ctx.moveTo(cancelX - buttonSize*0.15, cancelX - buttonSize*0.15)
+  ctx.lineTo(cancelX + buttonSize*0.15, cancelX + buttonSize*0.15)
+  ctx.moveTo(cancelX + buttonSize*0.15, cancelX - buttonSize*0.15)
+  ctx.lineTo(cancelX - buttonSize*0.15, cancelX + buttonSize*0.15)
+  ctx.stroke()
+  
+  ctx.restore()
+  
+  // 存储按钮位置供点击检测使用
+  return {
+    confirm: { x: confirmX, y: buttonY, radius: buttonSize/2 },
+    cancel: { x: cancelX, y: buttonY, radius: buttonSize/2 }
+  }
+}
   if (!pos) return
   let radius = style.pieceScale / 2
   ctx.save()
@@ -344,14 +421,14 @@ export default {
     return {
       debouncedRedrawAllLayers: debounce(50, this.redrawAllLayers),
       throttledDrawRealtimeLayer: throttle(10, this.drawRealtimeLayer),
-      selecting: false,
-      selectedCoord: [0, 0],
-      pressed: false,
-      cancelMouse: false,
       ratioOverride: null,
       end: Infinity,
       // 悬停预览
       hoverCoord: null,
+      // 手机端预落子确认
+      pendingMove: null, // { x, y } 待确认的落子位置
+      showMobileConfirm: false, // 是否显示手机端确认按钮
+      confirmButtons: null, // 存储确认按钮的位置信息
     }
   },
   computed: {
@@ -417,6 +494,12 @@ export default {
     // Minimum touch target validation (Requirements: 6.2)
     minTouchTarget() {
       return Math.max(24, this.cellSize)
+    },
+    // 检测是否为移动设备
+    isMobileDevice() {
+      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+             ('ontouchstart' in window) || 
+             (navigator.maxTouchPoints > 0)
     },
   },
   methods: {
@@ -484,7 +567,15 @@ export default {
         drawHoverPiece(ctx, this.boardStyle, cellSize, this.hoverCoord, isBlack)
       }
 
-      if (this.selecting) drawSelection(ctx, this.boardStyle, cellSize, this.selectedCoord)
+      // 绘制手机端待确认的棋子（半透明）
+      if (this.pendingMove && this.showMobileConfirm) {
+        const isBlack = this.position.length % 2 === 0
+        drawHoverPiece(ctx, this.boardStyle, cellSize, [this.pendingMove.x, this.pendingMove.y], isBlack)
+        
+        // 绘制确认按钮并存储位置
+        this.confirmButtons = this.drawMobileConfirmButtons(ctx, cellSize)
+      }
+
       // 注意：不再显示 AI 的实时思考提示（红点/最佳着法），避免暴露 AI 棋路
       // drawRealtime 和 drawPvEval 功能已禁用，但 AI 内部计算不受影响
 
@@ -538,101 +629,78 @@ export default {
       gif.render()
     },
     onMouseDown(event) {
-      if (this.clickCheck == 2) {
-        if (event.type === 'touchstart') {
-          this.cancelMouse = true
-          event.button = 0
-          if (!event.pageX) event.pageX = event.touches[0].pageX
-          if (!event.pageY) event.pageY = event.touches[0].pageY
-        } else if (this.cancelMouse) {
-          this.cancelMouse = false
-          return
-        }
+      // 统一处理触摸和鼠标事件
+      const isTouchEvent = event.type === 'touchstart'
+      if (isTouchEvent) {
+        event.preventDefault()
+        event.button = 0
+        event.pageX = event.touches[0].pageX
+        event.pageY = event.touches[0].pageY
       }
 
       let x = event.pageX - this.$refs.canvasBoard.getBoundingClientRect().left
       let y = event.pageY - this.$refs.canvasBoard.getBoundingClientRect().top
+
+      // 检查是否点击了确认按钮
+      if (this.showMobileConfirm && this.confirmButtons) {
+        const confirmBtn = this.confirmButtons.confirm
+        const cancelBtn = this.confirmButtons.cancel
+        
+        // 检查确认按钮
+        const confirmDist = Math.sqrt((x - confirmBtn.x) ** 2 + (y - confirmBtn.y) ** 2)
+        if (confirmDist <= confirmBtn.radius) {
+          this.confirmMove()
+          return
+        }
+        
+        // 检查取消按钮
+        const cancelDist = Math.sqrt((x - cancelBtn.x) ** 2 + (y - cancelBtn.y) ** 2)
+        if (cancelDist <= cancelBtn.radius) {
+          this.cancelMove()
+          return
+        }
+        
+        // 点击其他地方也取消
+        this.cancelMove()
+        return
+      }
+
       let cellSize = this.boardWidth / this.boardSize
-      x = Math.floor((x - paddingX) / cellSize)
-      y = Math.floor((y - paddingTop) / cellSize)
+      let boardX = Math.floor((x - paddingX) / cellSize)
+      let boardY = Math.floor((y - paddingTop) / cellSize)
 
       if (event.button != 0) {
-        this.$emit('clicked', { x, y, button: event.button })
+        this.$emit('clicked', { x: boardX, y: boardY, button: event.button })
         return
       } else if (this.winline.length > 0) return
 
-      if (this.clickCheck == 0 || this.isAiTurn)
-        this.$emit('clicked', { x, y, button: event.button })
-      else if (this.clickCheck == 1) {
-        if (this.selecting) {
-          let dx = Math.abs(x - this.selectedCoord[0])
-          let dy = Math.abs(y - this.selectedCoord[1])
-          if (Math.max(dx, dy) <= 1)
-            this.$emit('clicked', {
-              x: this.selectedCoord[0],
-              y: this.selectedCoord[1],
-              button: event.button,
-            })
+      // 检查位置是否有效
+      if (!this.isInBoard([boardX, boardY]) || !this.isEmptyPos([boardX, boardY])) return
+
+      if (!this.isAiTurn) {
+        // 移动设备使用确认机制
+        if (isTouchEvent && this.isMobileDevice) {
+          this.pendingMove = { x: boardX, y: boardY }
+          this.showMobileConfirm = true
+          this.throttledDrawRealtimeLayer()
         } else {
-          this.selectedCoord = [x, y]
+          // 桌面端直接落子
+          this.$emit('clicked', { x: boardX, y: boardY, button: event.button })
         }
-        this.selecting = !this.selecting
-      } else if (this.clickCheck == 2) {
-        this.pressed = true
-        this.selectedCoord = [x, y - 2]
-        this.selecting = this.isInBoard(this.selectedCoord)
       }
     },
     onMouseUp(event) {
-      if (!this.pressed) return
-
+      // 触摸事件不需要额外处理
       if (event.type === 'touchend') {
         event.preventDefault()
-        event.button = 0
       }
-
-      this.$emit('clicked', {
-        x: this.selectedCoord[0],
-        y: this.selectedCoord[1],
-        button: event.button,
-      })
-
-      this.selecting = false
-      this.pressed = false
-      this.hoverCoord = null
-      this.throttledDrawRealtimeLayer()
     },
     onMouseMove(event) {
-      // 处理拖拽选择
-      if (this.pressed) {
-        if (event.type === 'touchmove') {
-          event.preventDefault()
-          event.button = 0
-          if (!event.pageX) event.pageX = event.touches[0].pageX
-          if (!event.pageY) event.pageY = event.touches[0].pageY
-        }
-
-        let x = event.pageX - this.$refs.canvasBoard.getBoundingClientRect().left
-        let y = event.pageY - this.$refs.canvasBoard.getBoundingClientRect().top
-        let cellSize = this.boardWidth / this.boardSize
-        x = Math.floor((x - paddingX) / cellSize)
-        y = Math.floor((y - paddingTop) / cellSize)
-
-        let oldCoord = this.selectedCoord
-        this.selectedCoord = [x, y - 2]
-        this.selecting = this.isInBoard(this.selectedCoord)
-
-        if (
-          this.selecting &&
-          (oldCoord[0] != this.selectedCoord[0] || oldCoord[1] != this.selectedCoord[1])
-        ) {
-          this.throttledDrawRealtimeLayer()
-        }
+      // 处理悬停预览（仅桌面端）
+      if (event.type === 'touchmove') {
+        event.preventDefault()
         return
       }
-
-      // 处理悬停预览（仅桌面端）
-      if (event.type === 'touchmove') return
       
       let x = event.pageX - this.$refs.canvasBoard.getBoundingClientRect().left
       let y = event.pageY - this.$refs.canvasBoard.getBoundingClientRect().top
@@ -659,6 +727,95 @@ export default {
       if (this.hoverCoord) {
         this.hoverCoord = null
         this.throttledDrawRealtimeLayer()
+      }
+    },
+    // 确认落子
+    confirmMove() {
+      if (this.pendingMove) {
+        this.$emit('clicked', { 
+          x: this.pendingMove.x, 
+          y: this.pendingMove.y, 
+          button: 0 
+        })
+        this.cancelMove()
+      }
+    },
+    // 取消落子
+    cancelMove() {
+      this.pendingMove = null
+      this.showMobileConfirm = false
+      this.confirmButtons = null
+      this.throttledDrawRealtimeLayer()
+    },
+    // 绘制手机端确认按钮
+    drawMobileConfirmButtons(ctx, cellSize) {
+      if (!this.pendingMove) return null
+      
+      ctx.save()
+      
+      // 计算按钮位置
+      const buttonSize = Math.min(cellSize * 0.8, 40)
+      const pieceX = paddingX + cellSize / 2 + this.pendingMove.x * cellSize
+      const pieceY = paddingTop + cellSize / 2 + this.pendingMove.y * cellSize
+      
+      // 确保按钮在画布内
+      let confirmX = pieceX + cellSize * 0.8
+      let cancelX = pieceX - cellSize * 0.8
+      let buttonY = pieceY
+      
+      // 边界检查和调整
+      if (confirmX + buttonSize > this.canvasWidth - 10) {
+        confirmX = pieceX - cellSize * 0.8
+        cancelX = pieceX - cellSize * 1.6
+      }
+      if (cancelX < 10) {
+        cancelX = pieceX + cellSize * 0.8
+        confirmX = pieceX + cellSize * 1.6
+      }
+      if (buttonY - buttonSize/2 < 10) {
+        buttonY = pieceY + cellSize * 0.8
+      }
+      if (buttonY + buttonSize/2 > this.canvasHeight - 10) {
+        buttonY = pieceY - cellSize * 0.8
+      }
+      
+      // 绘制确认按钮 (✓)
+      ctx.fillStyle = 'rgba(76, 175, 80, 0.9)'
+      ctx.beginPath()
+      ctx.arc(confirmX, buttonY, buttonSize/2, 0, Math.PI * 2)
+      ctx.fill()
+      
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(confirmX - buttonSize*0.2, buttonY)
+      ctx.lineTo(confirmX - buttonSize*0.05, buttonY + buttonSize*0.15)
+      ctx.lineTo(confirmX + buttonSize*0.2, buttonY - buttonSize*0.15)
+      ctx.stroke()
+      
+      // 绘制取消按钮 (✗)
+      ctx.fillStyle = 'rgba(244, 67, 54, 0.9)'
+      ctx.beginPath()
+      ctx.arc(cancelX, buttonY, buttonSize/2, 0, Math.PI * 2)
+      ctx.fill()
+      
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 3
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(cancelX - buttonSize*0.15, buttonY - buttonSize*0.15)
+      ctx.lineTo(cancelX + buttonSize*0.15, buttonY + buttonSize*0.15)
+      ctx.moveTo(cancelX + buttonSize*0.15, buttonY - buttonSize*0.15)
+      ctx.lineTo(cancelX - buttonSize*0.15, buttonY + buttonSize*0.15)
+      ctx.stroke()
+      
+      ctx.restore()
+      
+      // 返回按钮位置供点击检测使用
+      return {
+        confirm: { x: confirmX, y: buttonY, radius: buttonSize/2 },
+        cancel: { x: cancelX, y: buttonY, radius: buttonSize/2 }
       }
     },
     // 检查位置是否为空
@@ -755,9 +912,6 @@ export default {
     showForbid() {
       this.drawRealtimeLayer()
     },
-    selecting() {
-      this.throttledDrawRealtimeLayer()
-    },
     boardStyle: {
       handler() {
         this.debouncedRedrawAllLayers()
@@ -767,15 +921,6 @@ export default {
   },
   mounted() {
     this.redrawAllLayers()
-    window.addEventListener('mousemove', throttle(50, this.onMouseMove))
-    window.addEventListener('mouseup', this.onMouseUp)
-    window.addEventListener('touchmove', throttle(50, this.onMouseMove), {
-      passive: false,
-    })
-    window.addEventListener('touchend', this.onMouseUp, { passive: false })
-    
-    // 添加鼠标离开事件
-    this.$refs.canvasRealtime.addEventListener('mouseleave', this.onMouseLeave)
     
     // Prevent double-tap zoom on mobile (Requirements: 6.6)
     this.preventDoubleTapZoom()
