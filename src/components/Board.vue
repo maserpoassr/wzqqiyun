@@ -500,9 +500,13 @@ export default {
     },
     // 检测是否为移动设备
     isMobileDevice() {
-      return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
-             ('ontouchstart' in window) || 
-             (navigator.maxTouchPoints > 0)
+      // 更准确的移动设备检测
+      const userAgent = navigator.userAgent.toLowerCase()
+      const isMobileUA = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent)
+      const hasTouchScreen = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0)
+      const isSmallScreen = window.innerWidth <= 1024 // 平板及以下尺寸
+      
+      return isMobileUA || (hasTouchScreen && isSmallScreen)
     },
   },
   methods: {
@@ -634,31 +638,38 @@ export default {
     onMouseDown(event) {
       // 统一处理触摸和鼠标事件
       const isTouchEvent = event.type === 'touchstart'
+      
+      // 获取正确的坐标
+      let clientX, clientY
       if (isTouchEvent) {
         event.preventDefault()
-        event.button = 0
-        event.pageX = event.touches[0].pageX
-        event.pageY = event.touches[0].pageY
+        clientX = event.touches[0].clientX
+        clientY = event.touches[0].clientY
+      } else {
+        clientX = event.clientX
+        clientY = event.clientY
       }
 
-      let x = event.pageX - this.$refs.canvasBoard.getBoundingClientRect().left
-      let y = event.pageY - this.$refs.canvasBoard.getBoundingClientRect().top
+      // 使用realtime canvas作为参考，因为它在最上层
+      const rect = this.$refs.canvasRealtime.getBoundingClientRect()
+      let x = clientX - rect.left
+      let y = clientY - rect.top
 
       // 检查是否点击了确认按钮
       if (this.showMobileConfirm && this.confirmButtons) {
         const confirmBtn = this.confirmButtons.confirm
         const cancelBtn = this.confirmButtons.cancel
         
-        // 检查确认按钮
+        // 检查确认按钮 - 扩大点击区域
         const confirmDist = Math.sqrt((x - confirmBtn.x) ** 2 + (y - confirmBtn.y) ** 2)
-        if (confirmDist <= confirmBtn.radius) {
+        if (confirmDist <= confirmBtn.radius + 10) { // 增加10px的容错范围
           this.confirmMove()
           return
         }
         
-        // 检查取消按钮
+        // 检查取消按钮 - 扩大点击区域
         const cancelDist = Math.sqrt((x - cancelBtn.x) ** 2 + (y - cancelBtn.y) ** 2)
-        if (cancelDist <= cancelBtn.radius) {
+        if (cancelDist <= cancelBtn.radius + 10) { // 增加10px的容错范围
           this.cancelMove()
           return
         }
@@ -669,10 +680,12 @@ export default {
       }
 
       let cellSize = this.boardWidth / this.boardSize
-      let boardX = Math.floor((x - paddingX) / cellSize)
-      let boardY = Math.floor((y - paddingTop) / cellSize)
+      
+      // 更精确的棋盘坐标计算 - 四舍五入到最近的交叉点
+      let boardX = Math.round((x - paddingX - cellSize/2) / cellSize)
+      let boardY = Math.round((y - paddingTop - cellSize/2) / cellSize)
 
-      if (event.button != 0) {
+      if (event.button && event.button != 0) {
         this.$emit('clicked', { x: boardX, y: boardY, button: event.button })
         return
       } else if (this.winline.length > 0) return
@@ -688,7 +701,7 @@ export default {
           this.throttledDrawRealtimeLayer()
         } else {
           // 桌面端直接落子
-          this.$emit('clicked', { x: boardX, y: boardY, button: event.button })
+          this.$emit('clicked', { x: boardX, y: boardY, button: 0 })
         }
       }
     },
@@ -756,61 +769,77 @@ export default {
       
       ctx.save()
       
-      // 计算按钮位置
-      const buttonSize = Math.min(cellSize * 0.8, 40)
+      // 计算按钮位置 - 使用更大的按钮
+      const buttonSize = Math.max(50, cellSize * 0.9) // 最小50px，确保易于点击
       const pieceX = paddingX + cellSize / 2 + this.pendingMove.x * cellSize
       const pieceY = paddingTop + cellSize / 2 + this.pendingMove.y * cellSize
       
-      // 确保按钮在画布内
-      let confirmX = pieceX + cellSize * 0.8
-      let cancelX = pieceX - cellSize * 0.8
+      // 确保按钮在画布内，并且有足够的间距
+      let confirmX = pieceX + cellSize * 1.2
+      let cancelX = pieceX - cellSize * 1.2
       let buttonY = pieceY
       
       // 边界检查和调整
-      if (confirmX + buttonSize > this.canvasWidth - 10) {
+      if (confirmX + buttonSize/2 > this.canvasWidth - 20) {
+        // 右边界超出，调整到左侧
         confirmX = pieceX - cellSize * 0.8
-        cancelX = pieceX - cellSize * 1.6
+        cancelX = pieceX - cellSize * 2.0
       }
-      if (cancelX < 10) {
+      if (cancelX - buttonSize/2 < 20) {
+        // 左边界超出，调整到右侧
         cancelX = pieceX + cellSize * 0.8
-        confirmX = pieceX + cellSize * 1.6
-      }
-      if (buttonY - buttonSize/2 < 10) {
-        buttonY = pieceY + cellSize * 0.8
-      }
-      if (buttonY + buttonSize/2 > this.canvasHeight - 10) {
-        buttonY = pieceY - cellSize * 0.8
+        confirmX = pieceX + cellSize * 2.0
       }
       
-      // 绘制确认按钮 (✓)
-      ctx.fillStyle = 'rgba(76, 175, 80, 0.9)'
+      // 垂直位置调整
+      if (buttonY - buttonSize/2 < 20) {
+        buttonY = pieceY + cellSize * 1.2
+      }
+      if (buttonY + buttonSize/2 > this.canvasHeight - 20) {
+        buttonY = pieceY - cellSize * 1.2
+      }
+      
+      // 绘制确认按钮 (✓) - 绿色
+      ctx.fillStyle = 'rgba(76, 175, 80, 0.95)'
       ctx.beginPath()
       ctx.arc(confirmX, buttonY, buttonSize/2, 0, Math.PI * 2)
       ctx.fill()
       
-      ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
-      ctx.lineCap = 'round'
-      ctx.beginPath()
-      ctx.moveTo(confirmX - buttonSize*0.2, buttonY)
-      ctx.lineTo(confirmX - buttonSize*0.05, buttonY + buttonSize*0.15)
-      ctx.lineTo(confirmX + buttonSize*0.2, buttonY - buttonSize*0.15)
+      // 绿色按钮边框
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.lineWidth = 2
       ctx.stroke()
       
-      // 绘制取消按钮 (✗)
-      ctx.fillStyle = 'rgba(244, 67, 54, 0.9)'
+      // 绘制勾号
+      ctx.strokeStyle = '#ffffff'
+      ctx.lineWidth = 4
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(confirmX - buttonSize*0.15, buttonY)
+      ctx.lineTo(confirmX - buttonSize*0.05, buttonY + buttonSize*0.12)
+      ctx.lineTo(confirmX + buttonSize*0.15, buttonY - buttonSize*0.12)
+      ctx.stroke()
+      
+      // 绘制取消按钮 (✗) - 红色
+      ctx.fillStyle = 'rgba(244, 67, 54, 0.95)'
       ctx.beginPath()
       ctx.arc(cancelX, buttonY, buttonSize/2, 0, Math.PI * 2)
       ctx.fill()
       
+      // 红色按钮边框
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      
+      // 绘制叉号
       ctx.strokeStyle = '#ffffff'
-      ctx.lineWidth = 3
+      ctx.lineWidth = 4
       ctx.lineCap = 'round'
       ctx.beginPath()
-      ctx.moveTo(cancelX - buttonSize*0.15, buttonY - buttonSize*0.15)
-      ctx.lineTo(cancelX + buttonSize*0.15, buttonY + buttonSize*0.15)
-      ctx.moveTo(cancelX + buttonSize*0.15, buttonY - buttonSize*0.15)
-      ctx.lineTo(cancelX - buttonSize*0.15, buttonY + buttonSize*0.15)
+      ctx.moveTo(cancelX - buttonSize*0.12, buttonY - buttonSize*0.12)
+      ctx.lineTo(cancelX + buttonSize*0.12, buttonY + buttonSize*0.12)
+      ctx.moveTo(cancelX + buttonSize*0.12, buttonY - buttonSize*0.12)
+      ctx.lineTo(cancelX - buttonSize*0.12, buttonY + buttonSize*0.12)
       ctx.stroke()
       
       ctx.restore()
