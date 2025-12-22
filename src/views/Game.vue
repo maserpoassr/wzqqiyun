@@ -1,9 +1,5 @@
 <template>
   <div class="game-scene">
-    <div v-if="showOrientationHint" class="orientation-overlay" @click="showOrientationHint = false">
-      <i class="fa fa-mobile fa-rotate-90"></i>
-      <span>为了最佳对弈体验，请旋转手机</span>
-    </div>
 
     <div class="game-hud">
       <div class="hud-pill">
@@ -111,9 +107,7 @@ export default {
     return {
       showLoading: false,
       showGameEndPopup: false,
-      showOrientationHint: false,
       showGameRules: false,
-      isPortrait: false,
       thinkingCanceled: false,
       playerColor: 'BLACK',
       gameStarted: false, // 游戏是否已开始
@@ -252,16 +246,6 @@ export default {
       this.switchPlayerColor()
       this.newGame()
     },
-    checkOrientation() {
-      const isMobile = this.screenWidth <= 896
-      this.isPortrait = this.screenHeight > this.screenWidth
-      if (isMobile && this.isPortrait) {
-        this.showOrientationHint = true
-        setTimeout(() => { this.showOrientationHint = false }, 5000)
-      } else {
-        this.showOrientationHint = false
-      }
-    },
   },
   watch: {
     loadingProgress(progress) { if (progress === 1) this.showLoading = false },
@@ -273,13 +257,6 @@ export default {
       this.showGameRules = true
       localStorage.setItem('gomoku_rules_seen', 'true')
     }
-    this.checkOrientation()
-    window.addEventListener('resize', this.checkOrientation)
-    window.addEventListener('orientationchange', this.checkOrientation)
-  },
-  beforeDestroy() {
-    window.removeEventListener('resize', this.checkOrientation)
-    window.removeEventListener('orientationchange', this.checkOrientation)
   },
 }
 </script>
@@ -494,15 +471,6 @@ export default {
     background: #eee; 
     box-shadow: inset -2px -2px 4px rgba(0,0,0,0.2); 
   }
-}
-
-/* 方向提示 */
-.orientation-overlay {
-  position: fixed; top: 0; left: 0; right: 0;
-  background: @gold; color: #000;
-  padding: 10px; text-align: center;
-  z-index: 9999; font-weight: bold; font-size: 12px;
-  display: flex; justify-content: center; align-items: center; gap: 10px;
 }
 
 /* Loading Dialog */
