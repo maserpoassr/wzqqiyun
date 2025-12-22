@@ -118,11 +118,33 @@ export default {
 
     const loadEngine = (loadFullEngine) => {
       _this.initEngine(loadFullEngine).catch((err) => {
-        _this.$vux.alert.show_i18n({
-          title: _this.$t('game.engineLoadingError'),
-          content: err.toString(),
-        })
+        console.error('Engine loading error:', err)
+        // 如果完整引擎加载失败，尝试加载 fallback 引擎
+        if (loadFullEngine) {
+          console.log('Trying fallback engine...')
+          _this.initEngine(false).catch((err2) => {
+            _this.$vux.alert.show_i18n({
+              title: _this.$t('game.engineLoadingError'),
+              content: err2.toString(),
+            })
+          })
+        } else {
+          _this.$vux.alert.show_i18n({
+            title: _this.$t('game.engineLoadingError'),
+            content: err.toString(),
+          })
+        }
       })
+    }
+
+    // 立即开始加载引擎，不等待 Service Worker
+    // Service Worker 只用于缓存，不应该阻塞引擎加载
+    let engineLoaded = false
+    
+    const tryLoadEngine = () => {
+      if (engineLoaded) return
+      engineLoaded = true
+      loadEngine(true)
     }
 
     // 注册 Service Worker
@@ -133,7 +155,18 @@ export default {
             'App is being served from cache by a service worker.\n' +
             'For more details, visit https://goo.gl/AFskqB'
           )
-          loadEngine(true)
+          tryLoadEngine()
+        },
+        registered() {
+          console.log('Service worker has been registered.')
+          // Service Worker 注册后也尝试加载引擎
+          tryLoadEngine()
+        },
+        cached() {
+          console.log('Content has been cached for offline use.')
+        },
+        updatefound() {
+          console.log('New content is downloading.')
         },
         updated() {
           _this.$vux.confirm.show_i18n({
@@ -145,10 +178,24 @@ export default {
             onCancel() { }
           })
         },
+        offline() {
+          console.log('No internet connection found. App is running in offline mode.')
+          tryLoadEngine()
+        },
         error(error) {
           console.error('Error during service worker registration:', error)
+          // Service Worker 注册失败时也要加载引擎
+          tryLoadEngine()
         }
       })
+
+      // 设置超时，如果 3 秒内 Service Worker 没有 ready，直接加载引擎
+      setTimeout(() => {
+        if (!engineLoaded) {
+          console.log('Service Worker timeout, loading engine directly...')
+          tryLoadEngine()
+        }
+      }, 3000)
 
       window.addEventListener('beforeinstallprompt', (e) => {
         // 阻止默认的安装提示，不显示任何弹窗
