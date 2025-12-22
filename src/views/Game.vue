@@ -16,8 +16,12 @@
          </div>
       </div>
 
-      <div class="hud-status" :class="{ 'ai-thinking': thinking }">
-        <template v-if="!gameStarted">
+      <div class="hud-status" :class="{ 'ai-thinking': thinking, 'engine-loading': !ready }">
+        <template v-if="!ready">
+          <span class="loading-pulse"></span>
+          <span>AI 加载中 {{ Math.floor(loadingProgress * 100) }}%</span>
+        </template>
+        <template v-else-if="!gameStarted">
           <span class="ready-text">准备中</span>
           <span class="hint-text">选择棋子后点击开始</span>
         </template>
@@ -55,7 +59,7 @@
           <span>{{ playerColor === 'BLACK' ? '执黑' : '执白' }}</span>
         </button>
 
-        <button class="dock-btn start" :disabled="gameStarted" @click="startGame">
+        <button class="dock-btn start" :disabled="gameStarted || !ready" @click="startGame">
           <div class="icon-circle green"><i class="fa fa-play"></i></div>
           <span>开始</span>
         </button>
@@ -359,6 +363,16 @@ export default {
 .thinking-pulse {
   width: 8px; height: 8px; background: @gold; border-radius: 50%;
   animation: pulse 1.5s infinite;
+}
+
+.loading-pulse {
+  width: 8px; height: 8px; background: #4CAF50; border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+.engine-loading {
+  border-color: rgba(76, 175, 80, 0.4);
+  color: #4CAF50;
 }
 @keyframes pulse { 
   0% { opacity: 0.4; transform: scale(0.8); } 
