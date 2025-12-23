@@ -135,19 +135,23 @@ async function preloadRapfiData(onProgress) {
 }
 
 function locateFile(url, engineDirURL) {
+  console.log('[Engine] locateFile called with url:', url)
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
   if (/^rapfi.*\.data$/.test(url)) {
     url = 'rapfi.data'
     
     // 如果已经预加载，直接从内存返回
     if (preloadedDataBuffer) {
-      console.log('[Engine] Using preloaded rapfi.data from memory')
+      console.log('[Engine] Using preloaded rapfi.data from memory (buffer size:', preloadedDataBuffer.byteLength, 'bytes)')
       // 创建 Blob URL，Emscripten 会自动处理
       if (!preloadedBlobURL) {
         const blob = new Blob([preloadedDataBuffer], { type: 'application/octet-stream' })
         preloadedBlobURL = URL.createObjectURL(blob)
+        console.log('[Engine] Created Blob URL:', preloadedBlobURL)
       }
       return preloadedBlobURL
+    } else {
+      console.log('[Engine] preloadedDataBuffer is NULL, falling back to network')
     }
     
     // 如果配置了国内 CDN，从 CDN 加载大文件
@@ -278,11 +282,13 @@ async function selectAndValidateVariant(hasThreads, hasSIMD, loadFullEngine) {
 
 // Init engine and setup callback function for receiving engine output
 async function init(callbackFn_, loadFullEngine) {
+  console.log('[Engine] init called with loadFullEngine:', loadFullEngine)
   callback = callbackFn_
   dataLoaded = false
 
   // 先用分块并行下载预加载 rapfi.data
   if (loadFullEngine && CHINA_CDN_URL) {
+    console.log('[Engine] Starting CDN preload for rapfi.data...')
     await preloadRapfiData((loaded, total) => {
       callback({
         loading: {
@@ -292,6 +298,9 @@ async function init(callbackFn_, loadFullEngine) {
         },
       })
     })
+    console.log('[Engine] CDN preload completed, preloadedDataBuffer:', preloadedDataBuffer ? 'OK' : 'NULL')
+  } else {
+    console.log('[Engine] Skipping CDN preload - loadFullEngine:', loadFullEngine, 'CHINA_CDN_URL:', CHINA_CDN_URL)
   }
 
   // Detect browser capabilities
