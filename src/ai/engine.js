@@ -16,10 +16,140 @@ const WASM_VARIANTS = [
 // CDN 地址 - Cloudflare R2（免费出站流量）
 const CHINA_CDN_URL = 'https://cdn.hfive.ggff.net/' // Cloudflare R2 自定义域名
 
+// 分块下载配置
+const DEFAULT_CHUNK_COUNT = 10 // 默认 10 线程并行下载
+
+// 预下载的数据缓存
+let preloadedDataBuffer = null
+let preloadedBlobURL = null
+
+/**
+ * 分块并行下载文件
+ * @param {string} url - 文件 URL
+ * @param {number} totalSize - 文件总大小
+ * @param {number} chunkCount - 分块数量
+ * @param {function} onProgress - 进度回调
+ * @returns {Promise<ArrayBuffer>} 完整文件数据
+ */
+async function downloadInChunks(url, totalSize, chunkCount, onProgress) {
+  const chunkSize = Math.ceil(totalSize / chunkCount)
+  let loadedBytes = 0
+
+  console.log(`[Engine] Starting ${chunkCount}-thread parallel download (${(totalSize / 1024 / 1024).toFixed(2)} MB)...`)
+  console.time('[Engine] Download time')
+
+  // 创建分块下载任务
+  const downloadTasks = []
+  for (let i = 0; i < chunkCount; i++) {
+    const start = i * chunkSize
+    const end = Math.min(start + chunkSize - 1, totalSize - 1)
+    
+    const task = fetch(url, {
+      headers: { Range: `bytes=${start}-${end}` }
+    })
+      .then(response => {
+        if (!response.ok && response.status !== 206) {
+          throw new Error(`Chunk ${i} failed: ${response.status}`)
+        }
+        return response.arrayBuffer()
+      })
+      .then(buffer => {
+        loadedBytes += buffer.byteLength
+        if (onProgress) {
+          onProgress(loadedBytes, totalSize)
+        }
+        return { index: i, buffer }
+      })
+    
+    downloadTasks.push(task)
+  }
+
+  // 并行下载所有分块
+  const results = await Promise.all(downloadTasks)
+  
+  // 按顺序合并分块
+  results.sort((a, b) => a.index - b.index)
+  
+  const totalBuffer = new Uint8Array(totalSize)
+  let offset = 0
+  for (const { buffer } of results) {
+    totalBuffer.set(new Uint8Array(buffer), offset)
+    offset += buffer.byteLength
+  }
+
+  console.timeEnd('[Engine] Download time')
+  console.log(`[Engine] Download complete: ${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+  return totalBuffer.buffer
+}
+
+/**
+ * 预加载 rapfi.data 文件（分块并行下载）
+ * @param {function} onProgress - 进度回调
+ * @returns {Promise<void>}
+ */
+async function preloadRapfiData(onProgress) {
+  if (preloadedDataBuffer) {
+    console.log('[Engine] rapfi.data already preloaded')
+    return
+  }
+
+  const url = CHINA_CDN_URL + 'rapfi.data'
+  
+  try {
+    // 第一步：用 HEAD 请求获取准确的文件大小
+    const headResponse = await fetch(url, { method: 'HEAD' })
+    if (!headResponse.ok) throw new Error('HEAD request failed')
+    
+    const totalSize = parseInt(headResponse.headers.get('content-length'), 10)
+    if (!totalSize || totalSize <= 0) throw new Error('Cannot get file size')
+    
+    console.log(`[Engine] Detected rapfi.data size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+    
+    // 检查是否支持 Range 请求
+    const acceptRanges = headResponse.headers.get('accept-ranges')
+    if (acceptRanges !== 'bytes') {
+      console.warn('[Engine] Server does not support Range requests, falling back to single download')
+      const response = await fetch(url)
+      preloadedDataBuffer = await response.arrayBuffer()
+      if (onProgress) onProgress(totalSize, totalSize)
+      return
+    }
+    
+    // 动态调整分块数量
+    const chunkCount = totalSize > 50 * 1024 * 1024 ? 16 : DEFAULT_CHUNK_COUNT
+    
+    preloadedDataBuffer = await downloadInChunks(
+      url,
+      totalSize,
+      chunkCount,
+      onProgress
+    )
+    console.log('[Engine] rapfi.data preloaded successfully')
+  } catch (error) {
+    console.error('[Engine] Chunked download failed, falling back to single download:', error)
+    // 回退到单线程下载
+    const response = await fetch(url)
+    if (!response.ok) throw error
+    preloadedDataBuffer = await response.arrayBuffer()
+  }
+}
+
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
   if (/^rapfi.*\.data$/.test(url)) {
     url = 'rapfi.data'
+    
+    // 如果已经预加载，直接从内存返回
+    if (preloadedDataBuffer) {
+      console.log('[Engine] Using preloaded rapfi.data from memory')
+      // 创建 Blob URL，Emscripten 会自动处理
+      if (!preloadedBlobURL) {
+        const blob = new Blob([preloadedDataBuffer], { type: 'application/octet-stream' })
+        preloadedBlobURL = URL.createObjectURL(blob)
+      }
+      return preloadedBlobURL
+    }
+    
     // 如果配置了国内 CDN，从 CDN 加载大文件
     if (CHINA_CDN_URL) {
       console.log('[Engine] Loading rapfi.data from China CDN')
@@ -150,6 +280,19 @@ async function selectAndValidateVariant(hasThreads, hasSIMD, loadFullEngine) {
 async function init(callbackFn_, loadFullEngine) {
   callback = callbackFn_
   dataLoaded = false
+
+  // 先用分块并行下载预加载 rapfi.data
+  if (loadFullEngine && CHINA_CDN_URL) {
+    await preloadRapfiData((loaded, total) => {
+      callback({
+        loading: {
+          progress: loaded / total,
+          loadedBytes: loaded,
+          totalBytes: total,
+        },
+      })
+    })
+  }
 
   // Detect browser capabilities
   supportThreads = await threads()
