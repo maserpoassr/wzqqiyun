@@ -14,8 +14,7 @@ const WASM_VARIANTS = [
 ]
 
 // CDN 地址 - Cloudflare R2（免费出站流量）
-// 设置为空字符串则从本地加载
-const CHINA_CDN_URL = 'https://pub-48ebff44fc3541d08f962a38d5a56563.r2.dev/' // Cloudflare R2
+const CHINA_CDN_URL = 'https://cdn.hfive.ggff.net/' // Cloudflare R2 自定义域名
 
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
