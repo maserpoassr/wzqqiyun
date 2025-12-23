@@ -15,7 +15,8 @@ const WASM_VARIANTS = [
 
 // 国内 CDN 地址（如果有的话）
 // 设置为空字符串则从本地加载
-const CHINA_CDN_URL = 'https://t7pph32t4.hn-bkt.clouddn.com/' // 七牛云 CDN
+// 注意：必须使用 HTTPS 链接，否则会被浏览器阻止（混合内容）
+const CHINA_CDN_URL = '' // 暂时禁用，等配置好 HTTPS CDN 后再启用
 
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
