@@ -13,9 +13,20 @@ const WASM_VARIANTS = [
   { name: 'rapfi-single', requiresThreads: false, requiresSIMD: false },
 ]
 
+// 国内 CDN 地址（如果有的话）
+// 设置为空字符串则从本地加载
+const CHINA_CDN_URL = 'https://t7pph32t4.hn-bkt.clouddn.com/' // 七牛云 CDN
+
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
-  if (/^rapfi.*\.data$/.test(url)) url = 'rapfi.data'
+  if (/^rapfi.*\.data$/.test(url)) {
+    url = 'rapfi.data'
+    // 如果配置了国内 CDN，从 CDN 加载大文件
+    if (CHINA_CDN_URL) {
+      console.log('[Engine] Loading rapfi.data from China CDN')
+      return CHINA_CDN_URL + url
+    }
+  }
   return engineDirURL + url
 }
 
