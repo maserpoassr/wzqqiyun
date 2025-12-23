@@ -13,10 +13,9 @@ const WASM_VARIANTS = [
   { name: 'rapfi-single', requiresThreads: false, requiresSIMD: false },
 ]
 
-// 国内 CDN 地址（如果有的话）
+// CDN 地址 - Cloudflare R2（免费出站流量）
 // 设置为空字符串则从本地加载
-// 注意：必须使用 HTTPS 链接，否则会被浏览器阻止（混合内容）
-const CHINA_CDN_URL = '' // 暂时禁用，等配置好 HTTPS CDN 后再启用
+const CHINA_CDN_URL = 'https://pub-48ebff44fc3541d08f962a38d5a56563.r2.dev/' // Cloudflare R2
 
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
