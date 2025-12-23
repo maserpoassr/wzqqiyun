@@ -2,8 +2,8 @@
 node_modules
 dist
 
-# Do not store the built data
-public/build
+# WASM engine files are now tracked (required for Docker build)
+# public/build
 
 # Nested git repositories
 gomoku-calculator-
