@@ -14,7 +14,8 @@ const WASM_VARIANTS = [
 ]
 
 // CDN 地址 - Cloudflare R2（免费出站流量）
-const CHINA_CDN_URL = 'https://cdn.hfive.ggff.net/' // Cloudflare R2 自定义域名
+// 仅在生产环境使用，本地开发时禁用以避免 CORS 问题
+const CHINA_CDN_URL = process.env.NODE_ENV === 'production' ? 'https://cdn.hfive.ggff.net/' : null
 
 // 分块下载配置
 const DEFAULT_CHUNK_COUNT = 10 // 默认 10 线程并行下载
@@ -137,7 +138,7 @@ async function preloadRapfiData(onProgress) {
 function locateFile(url, engineDirURL) {
   console.log('[Engine] locateFile called with url:', url)
   
-  // 只有 rapfi.data 文件从 CDN 加载（WASM 文件从本地加载）
+  // 所有 rapfi*.data 文件都映射到 rapfi.data
   if (/^rapfi.*\.data$/.test(url)) {
     // 如果已经预加载，直接从内存返回
     if (preloadedDataBuffer) {
@@ -150,14 +151,18 @@ function locateFile(url, engineDirURL) {
       return preloadedBlobURL
     }
     
-    // 预加载失败时，从 CDN 直接加载
+    // 预加载失败时，从 CDN 或本地加载 rapfi.data
     if (CHINA_CDN_URL) {
       console.log('[Engine] Loading rapfi.data from China CDN (fallback)')
       return CHINA_CDN_URL + 'rapfi.data'
     }
+    
+    // 本地加载
+    console.log('[Engine] Loading rapfi.data from local')
+    return engineDirURL + 'rapfi.data'
   }
   
-  // 其他文件（WASM、JS）从本地加载
+  // 其他文件从本地加载
   return engineDirURL + url
 }
 
