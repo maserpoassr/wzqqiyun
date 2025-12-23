@@ -136,30 +136,28 @@ async function preloadRapfiData(onProgress) {
 
 function locateFile(url, engineDirURL) {
   console.log('[Engine] locateFile called with url:', url)
-  // Redirect 'rapfi.*\.data' to 'rapfi.data'
+  
+  // 只有 rapfi.data 文件从 CDN 加载（WASM 文件从本地加载）
   if (/^rapfi.*\.data$/.test(url)) {
-    url = 'rapfi.data'
-    
     // 如果已经预加载，直接从内存返回
     if (preloadedDataBuffer) {
       console.log('[Engine] Using preloaded rapfi.data from memory (buffer size:', preloadedDataBuffer.byteLength, 'bytes)')
-      // 创建 Blob URL，Emscripten 会自动处理
       if (!preloadedBlobURL) {
         const blob = new Blob([preloadedDataBuffer], { type: 'application/octet-stream' })
         preloadedBlobURL = URL.createObjectURL(blob)
         console.log('[Engine] Created Blob URL:', preloadedBlobURL)
       }
       return preloadedBlobURL
-    } else {
-      console.log('[Engine] preloadedDataBuffer is NULL, falling back to network')
     }
     
-    // 如果配置了国内 CDN，从 CDN 加载大文件
+    // 预加载失败时，从 CDN 直接加载
     if (CHINA_CDN_URL) {
-      console.log('[Engine] Loading rapfi.data from China CDN')
-      return CHINA_CDN_URL + url
+      console.log('[Engine] Loading rapfi.data from China CDN (fallback)')
+      return CHINA_CDN_URL + 'rapfi.data'
     }
   }
+  
+  // 其他文件（WASM、JS）从本地加载
   return engineDirURL + url
 }
 
