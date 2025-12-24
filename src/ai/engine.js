@@ -71,7 +71,11 @@ async function downloadInChunks(url, totalSize, chunkCount, onProgress) {
   // 按顺序合并分块
   results.sort((a, b) => a.index - b.index)
   
-  const totalBuffer = new Uint8Array(totalSize)
+  // 计算实际下载的总大小
+  const actualTotalSize = results.reduce((sum, { buffer }) => sum + buffer.byteLength, 0)
+  console.log(`[Engine] Actual downloaded size: ${(actualTotalSize / 1024 / 1024).toFixed(2)} MB (expected: ${(totalSize / 1024 / 1024).toFixed(2)} MB)`)
+  
+  const totalBuffer = new Uint8Array(actualTotalSize)
   let offset = 0
   for (const { buffer } of results) {
     totalBuffer.set(new Uint8Array(buffer), offset)
@@ -79,7 +83,7 @@ async function downloadInChunks(url, totalSize, chunkCount, onProgress) {
   }
 
   console.timeEnd('[Engine] Download time')
-  console.log(`[Engine] Download complete: ${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+  console.log(`[Engine] Download complete: ${(actualTotalSize / 1024 / 1024).toFixed(2)} MB`)
   return totalBuffer.buffer
 }
 
@@ -129,9 +133,16 @@ async function preloadRapfiData(onProgress) {
   } catch (error) {
     console.error('[Engine] Chunked download failed, falling back to single download:', error)
     // 回退到单线程下载
-    const response = await fetch(url)
-    if (!response.ok) throw error
-    preloadedDataBuffer = await response.arrayBuffer()
+    try {
+      const response = await fetch(url)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      preloadedDataBuffer = await response.arrayBuffer()
+      console.log('[Engine] Single download completed:', (preloadedDataBuffer.byteLength / 1024 / 1024).toFixed(2), 'MB')
+      if (onProgress) onProgress(preloadedDataBuffer.byteLength, preloadedDataBuffer.byteLength)
+    } catch (fallbackError) {
+      console.error('[Engine] Single download also failed:', fallbackError)
+      throw fallbackError
+    }
   }
 }
 
