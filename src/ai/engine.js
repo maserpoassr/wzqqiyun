@@ -350,20 +350,57 @@ async function init(callbackFn_, loadFullEngine) {
   console.log(`[Engine] Final engine URL: ${finalEngineURL}`)
 
   if (useThreads) {
-    await script.import(/* webpackIgnore: true */ finalEngineURL)
+    try {
+      console.log('[Engine] Loading engine script...')
+      await script.import(/* webpackIgnore: true */ finalEngineURL)
+      console.log('[Engine] Engine script loaded, initializing Rapfi...')
 
-    const engineDirURL = finalEngineURL.substring(0, finalEngineURL.lastIndexOf('/') + 1)
+      const engineDirURL = finalEngineURL.substring(0, finalEngineURL.lastIndexOf('/') + 1)
 
-    engineInstance = await self['Rapfi']({
-      locateFile: (url) => locateFile(url, engineDirURL),
-      onReceiveStdout: (o) => onEngineStdout(o),
-      onReceiveStderr: (o) => onEngineStderr(o),
-      onExit: (c) => onEngineExit(c),
-      setStatus: (s) => onEngineStatus(s),
-      wasmMemory: instantiateSharedWasmMemory(),
-    })
-    dataLoaded = true
-    callback({ ok: true })
+      engineInstance = await self['Rapfi']({
+        locateFile: (url) => locateFile(url, engineDirURL),
+        onReceiveStdout: (o) => onEngineStdout(o),
+        onReceiveStderr: (o) => onEngineStderr(o),
+        onExit: (c) => onEngineExit(c),
+        setStatus: (s) => onEngineStatus(s),
+        wasmMemory: instantiateSharedWasmMemory(),
+      })
+      console.log('[Engine] Rapfi initialized successfully')
+      dataLoaded = true
+      callback({ ok: true })
+    } catch (error) {
+      console.error('[Engine] Failed to load engine with threads:', error)
+      // 回退到 Worker 模式
+      console.log('[Engine] Falling back to Worker mode...')
+      supportThreads = false
+      engineInstance = new Worker()
+
+      engineInstance.onmessage = (e) => {
+        const { type, data } = e.data
+        if (type === 'stdout') onEngineStdout(data)
+        else if (type === 'stderr') onEngineStderr(data)
+        else if (type === 'exit') onEngineExit(data)
+        else if (type === 'status') onEngineStatus(data)
+        else if (type === 'ready') (dataLoaded = true), callback({ ok: true })
+        else console.error('received unknown message from worker: ', e.data)
+      }
+
+      engineInstance.onerror = (err) => {
+        console.error('worker error: ' + err.message + '\nretrying after 0.5s...')
+        engineInstance.terminate()
+        setTimeout(() => init(callback), 500)
+      }
+
+      // 使用 fallback 引擎
+      const fallbackURL = `${process.env.BASE_URL}build/fallback/rapfi-single.js`
+      engineInstance.postMessage({
+        type: 'engineScriptURL',
+        data: {
+          engineURL: fallbackURL,
+          memoryArgs: getWasmMemoryArguments(false),
+        },
+      })
+    }
   } else {
     engineInstance = new Worker()
 
