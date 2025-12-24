@@ -1,12 +1,12 @@
-# Build stage - 使用 Node 16 以避免 OpenSSL 兼容性问题
-FROM node:16-alpine AS build
+# Build stage - 使用 Node 22 LTS
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies with legacy peer deps for Node 22 compatibility
 RUN npm ci --legacy-peer-deps
 
 # Copy source code
