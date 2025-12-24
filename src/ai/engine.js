@@ -493,6 +493,8 @@ function onEngineExit(code) {
 function onEngineStatus(status) {
   if (dataLoaded) return
 
+  console.log('[Engine] Status:', status)
+
   if (status === 'Running...' || status === '') {
     dataLoaded = true
     callback({
@@ -500,8 +502,10 @@ function onEngineStatus(status) {
         progress: 1.0,
       },
     })
+    return
   }
 
+  // 匹配 "Downloading data... (12345/67890)" 格式
   const match = status.match(/\((\d+)\/(\d+)\)/)
   if (match) {
     const loadedBytes = parseInt(match[1], 10)
@@ -512,6 +516,26 @@ function onEngineStatus(status) {
         progress: loadedBytes / totalBytes,
         loadedBytes: loadedBytes,
         totalBytes: totalBytes,
+      },
+    })
+    return
+  }
+
+  // 匹配 "Downloading data..." 开始下载
+  if (status.includes('Downloading')) {
+    callback({
+      loading: {
+        progress: 0.01, // 显示开始下载
+      },
+    })
+    return
+  }
+
+  // 匹配其他状态（如 "Loading..."）
+  if (status.includes('Loading') || status.includes('Compiling')) {
+    callback({
+      loading: {
+        progress: 0.95, // 接近完成
       },
     })
   }
