@@ -3,6 +3,9 @@ FROM node:22-alpine AS build
 
 WORKDIR /app
 
+# Set NODE_OPTIONS for OpenSSL legacy provider (required for webpack 4 with Node 22)
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 # Copy package files
 COPY package*.json ./
 
