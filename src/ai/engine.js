@@ -289,27 +289,39 @@ async function init(callbackFn_, loadFullEngine) {
   callback = callbackFn_
   dataLoaded = false
 
-  // 先用分块并行下载预加载 rapfi.data
-  if (loadFullEngine && CHINA_CDN_URL) {
-    console.log('[Engine] Starting CDN preload for rapfi.data...')
-    await preloadRapfiData((loaded, total) => {
-      callback({
-        loading: {
-          progress: loaded / total,
-          loadedBytes: loaded,
-          totalBytes: total,
-        },
-      })
-    })
-    console.log('[Engine] CDN preload completed, preloadedDataBuffer:', preloadedDataBuffer ? 'OK' : 'NULL')
-  } else {
-    console.log('[Engine] Skipping CDN preload - loadFullEngine:', loadFullEngine, 'CHINA_CDN_URL:', CHINA_CDN_URL)
-  }
-
-  // Detect browser capabilities
+  // Detect browser capabilities first
   supportThreads = await threads()
   const supportSIMD = await simd()
   const supportRelaxedSIMD = supportThreads && (await relaxedSimd())
+
+  console.log('[Engine] Browser capabilities:', {
+    threads: supportThreads,
+    simd: supportSIMD,
+    relaxedSimd: supportRelaxedSIMD,
+  })
+
+  // CDN 预加载只对支持线程的浏览器有效（主线程模式）
+  // Worker 模式（fallback）有自己的 locateFile，无法使用预加载的 buffer
+  if (loadFullEngine && CHINA_CDN_URL && supportThreads) {
+    console.log('[Engine] Starting CDN preload for rapfi.data (threads mode)...')
+    try {
+      await preloadRapfiData((loaded, total) => {
+        callback({
+          loading: {
+            progress: loaded / total,
+            loadedBytes: loaded,
+            totalBytes: total,
+          },
+        })
+      })
+      console.log('[Engine] CDN preload completed, preloadedDataBuffer:', preloadedDataBuffer ? 'OK' : 'NULL')
+    } catch (error) {
+      console.error('[Engine] CDN preload failed, will load from local:', error)
+      preloadedDataBuffer = null
+    }
+  } else {
+    console.log('[Engine] Skipping CDN preload - loadFullEngine:', loadFullEngine, 'CHINA_CDN_URL:', CHINA_CDN_URL, 'supportThreads:', supportThreads)
+  }
 
   console.log('[Engine] Browser capabilities:', {
     threads: supportThreads,
