@@ -27,9 +27,17 @@ COPY nginx.conf /etc/nginx/nginx.conf
 # Copy built assets from build stage
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Create certificate directory (will be empty if no certs provided)
+RUN mkdir -p /etc/nginx/certs
+
+# Copy entrypoint script
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
 # Expose ports for HTTP and HTTPS
 EXPOSE 80
 EXPOSE 443
 
-# Start nginx
+# Use entrypoint script to handle SSL certificate detection
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
