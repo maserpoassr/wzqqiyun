@@ -6,14 +6,11 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Clean install to regenerate lock file with Node 16 compatible versions
+RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
-
-# Set NODE_OPTIONS for legacy OpenSSL support (just in case)
-ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Build the application
 RUN npm run build
