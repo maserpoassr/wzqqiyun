@@ -1,16 +1,13 @@
-# Build stage - 使用 Node 22 LTS
-FROM node:22-alpine AS build
+# Build stage - 使用 Node 16 LTS (避免 OpenSSL 兼容性问题)
+FROM node:16-alpine AS build
 
 WORKDIR /app
-
-# Set NODE_OPTIONS for OpenSSL legacy provider (required for webpack 4 with Node 22)
-ENV NODE_OPTIONS=--openssl-legacy-provider
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies with legacy peer deps for Node 22 compatibility
-RUN npm ci --legacy-peer-deps
+# Install dependencies
+RUN npm ci
 
 # Copy source code
 COPY . .
