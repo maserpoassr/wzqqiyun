@@ -34,10 +34,15 @@
    Root directory: gomoku-calculator--master
    ```
 
-6. **环境变量（可选）**
+6. **环境变量（必需）**
    ```
-   NODE_VERSION=22
+   NODE_VERSION=20
+   NODE_OPTIONS=--openssl-legacy-provider
    ```
+   
+   **重要**: 必须设置这两个环境变量：
+   - `NODE_VERSION=20`: Wrangler需要Node 20+
+   - `NODE_OPTIONS=--openssl-legacy-provider`: 解决webpack与新版OpenSSL的兼容性问题
 
 7. **点击 "Save and Deploy"**
 
