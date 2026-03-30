@@ -15,7 +15,8 @@ const WASM_VARIANTS = [
 
 // CDN 地址 - Cloudflare R2（免费出站流量）
 // 仅在生产环境使用，本地开发时禁用以避免 CORS 问题
-const CHINA_CDN_URL = process.env.NODE_ENV === 'production' ? 'https://cdn.hfive.ggff.net/' : null
+// DISABLED: CDN has CORS issues, using local files only
+const CHINA_CDN_URL = null
 
 // 分块下载配置
 const DEFAULT_CHUNK_COUNT = 10 // 默认 10 线程并行下载
