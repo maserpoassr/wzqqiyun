@@ -3,10 +3,10 @@ set -e
 
 # Check if SSL certificates exist
 if [ ! -f /etc/nginx/certs/tls.crt ] || [ ! -f /etc/nginx/certs/tls.key ]; then
-    echo "SSL certificates not found, disabling HTTPS server block..."
+    echo "SSL certificates not found, using HTTP-only configuration..."
     
-    # Create a temporary nginx config without HTTPS
-    cat > /etc/nginx/nginx.conf.tmp << 'EOF'
+    # Create HTTP-only nginx config
+    cat > /etc/nginx/nginx.conf << 'EOF'
 worker_processes auto;
 error_log /var/log/nginx/error.log warn;
 pid /var/run/nginx.pid;
@@ -54,9 +54,9 @@ http {
         image/svg+xml;
 
     server {
-        listen 80;
-        listen [::]:80;
-        server_name localhost;
+        listen 80 default_server;
+        listen [::]:80 default_server;
+        server_name _;
 
         root /usr/share/nginx/html;
         index index.html;
@@ -104,7 +104,6 @@ http {
     }
 }
 EOF
-    mv /etc/nginx/nginx.conf.tmp /etc/nginx/nginx.conf
 else
     echo "SSL certificates found, using HTTPS configuration..."
 fi

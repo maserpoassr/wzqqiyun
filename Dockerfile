@@ -38,6 +38,6 @@ RUN chmod +x /docker-entrypoint.sh
 EXPOSE 80
 EXPOSE 443
 
-# Use entrypoint script to handle SSL certificate detection
+# Override nginx entrypoint completely
 ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["nginx", "-g", "daemon off;"]
