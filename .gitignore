@@ -5,6 +5,9 @@ dist
 # WASM engine files are now tracked (required for Docker build)
 # public/build
 
+# Exclude large .data files (38MB) - load from R2 CDN instead
+public/build/**/*.data
+
 # Nested git repositories
 gomoku-calculator-
 

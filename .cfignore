@@ -1,0 +1,14 @@
+# Cloudflare Pages ignore file
+# Exclude large model files - these will be loaded from R2 CDN
+
+# AI model data files (38MB each - exceeds 25MB limit)
+build/rapfi.data
+build/fallback/rapfi.data
+build/rapfi-thread.data
+build/fallback/rapfi-thread.data
+
+# Source files not needed in production
+src/
+tests/
+node_modules/
+.git/

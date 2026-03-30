@@ -3,18 +3,14 @@ module.exports = {
   productionSourceMap: false,
   
   chainWebpack: config => {
-    // Exclude large .data files from build output for Cloudflare Pages
+    // Completely exclude .data files from build output
     // These files will be loaded from R2 CDN instead
     config.module
-      .rule('exclude-large-data')
+      .rule('exclude-data-files')
       .test(/\.data$/)
-      .use('file-loader')
-      .loader('file-loader')
-      .options({
-        name: 'build/[name].[ext]',
-        // Don't emit the file, it will be loaded from CDN
-        emitFile: false
-      })
+      .type('javascript/auto')
+      .use('null-loader')
+      .loader('null-loader')
   },
 
   configureWebpack: {
@@ -36,6 +32,11 @@ module.exports = {
           ]
         }
       ]
+    },
+    // Ignore .data files completely
+    externals: {
+      './build/rapfi.data': 'null',
+      './build/fallback/rapfi.data': 'null'
     }
   },
 
