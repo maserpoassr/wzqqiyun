@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Clean install to regenerate lock file with Node 16 compatible versions
-RUN npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+# Remove lock file and do fresh install to avoid stale dependencies
+RUN rm -f package-lock.json && npm install --legacy-peer-deps
 
 # Copy source code
 COPY . .
