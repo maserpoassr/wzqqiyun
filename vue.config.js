@@ -18,6 +18,10 @@ module.exports = {
   },
 
   configureWebpack: {
+    // Add OpenSSL legacy provider for Node 17+
+    optimization: {
+      nodeEnv: process.env.NODE_ENV || 'production'
+    },
     module: {
       rules: [
         {
