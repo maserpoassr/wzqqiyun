@@ -12,6 +12,9 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Set NODE_OPTIONS for legacy OpenSSL support (just in case)
+ENV NODE_OPTIONS=--openssl-legacy-provider
+
 # Build the application
 RUN npm run build
 
