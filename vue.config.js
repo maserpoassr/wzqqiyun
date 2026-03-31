@@ -1,16 +1,29 @@
+const CopyWebpackPlugin = require('copy-webpack-plugin')
+
 module.exports = {
   publicPath: '/',
   productionSourceMap: false,
   
   chainWebpack: config => {
-    // Completely exclude .data files from build output
-    // These files will be loaded from R2 CDN instead
-    config.module
-      .rule('exclude-data-files')
-      .test(/\.data$/)
-      .type('javascript/auto')
-      .use('null-loader')
-      .loader('null-loader')
+    // Remove default copy plugin rule for public folder
+    config.plugins.delete('copy')
+    
+    // Add custom copy plugin that excludes .data files
+    config.plugin('copy').use(CopyWebpackPlugin, [{
+      patterns: [
+        {
+          from: 'public',
+          to: '',
+          globOptions: {
+            ignore: [
+              '**/.DS_Store',
+              '**/index.html',
+              '**/*.data' // Exclude all .data files
+            ]
+          }
+        }
+      ]
+    }])
   },
 
   configureWebpack: {
@@ -32,11 +45,13 @@ module.exports = {
           ]
         }
       ]
-    },
-    // Ignore .data files completely
-    externals: {
-      './build/rapfi.data': 'null',
-      './build/fallback/rapfi.data': 'null'
+    }
+  },
+
+  pluginOptions: {
+    i18n: {
+      localeDir: 'locales',
+      enableInSFC: false
     }
   },
 
