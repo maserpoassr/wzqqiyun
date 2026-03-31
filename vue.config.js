@@ -8,22 +8,18 @@ module.exports = {
     // Remove default copy plugin rule for public folder
     config.plugins.delete('copy')
     
-    // Add custom copy plugin that excludes .data files
-    config.plugin('copy').use(CopyWebpackPlugin, [{
-      patterns: [
-        {
-          from: 'public',
-          to: '',
-          globOptions: {
-            ignore: [
-              '**/.DS_Store',
-              '**/index.html',
-              '**/*.data' // Exclude all .data files
-            ]
-          }
-        }
-      ]
-    }])
+    // Add custom copy plugin that excludes .data files (v4 syntax)
+    config.plugin('copy').use(CopyWebpackPlugin, [[
+      {
+        from: 'public',
+        to: '',
+        ignore: [
+          '**/.DS_Store',
+          '**/index.html',
+          '**/*.data' // Exclude all .data files
+        ]
+      }
+    ]])
   },
 
   configureWebpack: {
