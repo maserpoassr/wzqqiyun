@@ -15,6 +15,10 @@ const WASM_VARIANTS = [
 
 const CHINA_CDN_URL = 'https://pub-48ebff44fc3541d08f962a38d5a56563.r2.dev/'
 
+// 最大引擎初始化重试次数
+const MAX_ENGINE_RETRIES = 3
+let engineRetryCount = 0
+
 // 分块下载配置
 const DEFAULT_CHUNK_COUNT = 20 // 默认 20 线程并行下载
 
@@ -44,7 +48,8 @@ async function downloadInChunks(url, totalSize, chunkCount, onProgress) {
     const end = Math.min(start + chunkSize - 1, totalSize - 1)
     
     const task = fetch(url, {
-      headers: { Range: `bytes=${start}-${end}` }
+      headers: { Range: `bytes=${start}-${end}` },
+      signal: AbortSignal.timeout(30000)
     })
       .then(response => {
         if (!response.ok && response.status !== 206) {
@@ -72,6 +77,9 @@ async function downloadInChunks(url, totalSize, chunkCount, onProgress) {
   const totalBuffer = new Uint8Array(totalSize)
   let offset = 0
   for (const { buffer } of results) {
+    if (offset + buffer.byteLength > totalSize) {
+      throw new Error('Chunk data exceeds expected total size')
+    }
     totalBuffer.set(new Uint8Array(buffer), offset)
     offset += buffer.byteLength
   }
@@ -96,19 +104,19 @@ async function preloadRapfiData(onProgress) {
   
   try {
     // 第一步：用 HEAD 请求获取准确的文件大小
-    const headResponse = await fetch(url, { method: 'HEAD' })
+    const headResponse = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(10000) })
     if (!headResponse.ok) throw new Error('HEAD request failed')
     
     const totalSize = parseInt(headResponse.headers.get('content-length'), 10)
     if (!totalSize || totalSize <= 0) throw new Error('Cannot get file size')
     
-    console.log(`[Engine] Detected rapfi.data size: ${(totalSize / 1024 / 1024).toFixed(2)} MB`)
+    console.log('[Engine] Detected rapfi.data size: ' + (totalSize / 1024 / 1024).toFixed(2) + ' MB')
     
     // 检查是否支持 Range 请求
     const acceptRanges = headResponse.headers.get('accept-ranges')
     if (acceptRanges !== 'bytes') {
       console.warn('[Engine] Server does not support Range requests, falling back to single download')
-      const response = await fetch(url)
+      const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
       preloadedDataBuffer = await response.arrayBuffer()
       if (onProgress) onProgress(totalSize, totalSize)
       return
@@ -127,7 +135,7 @@ async function preloadRapfiData(onProgress) {
   } catch (error) {
     console.error('[Engine] Chunked download failed, falling back to single download:', error)
     // 回退到单线程下载
-    const response = await fetch(url)
+    const response = await fetch(url, { signal: AbortSignal.timeout(30000) })
     if (!response.ok) throw error
     preloadedDataBuffer = await response.arrayBuffer()
   }
@@ -383,7 +391,13 @@ async function init(callbackFn_, loadFullEngine) {
       }
 
       engineInstance.onerror = (err) => {
-        console.error('worker error: ' + err.message + '\nretrying after 0.5s...')
+        if (engineRetryCount >= MAX_ENGINE_RETRIES) {
+          console.error('[Engine] Max retries reached, giving up')
+          callback({ error: 'Engine failed after ' + MAX_ENGINE_RETRIES + ' retries' })
+          return
+        }
+        engineRetryCount++
+        console.error('[Engine] worker error: ' + err.message + ' retry ' + engineRetryCount + '/' + MAX_ENGINE_RETRIES)
         engineInstance.terminate()
         setTimeout(() => init(callback), 500)
       }
@@ -408,12 +422,22 @@ async function init(callbackFn_, loadFullEngine) {
       else if (type === 'stderr') onEngineStderr(data)
       else if (type === 'exit') onEngineExit(data)
       else if (type === 'status') onEngineStatus(data)
-      else if (type === 'ready') (dataLoaded = true), callback({ ok: true })
+      else if (type === 'ready') {
+        dataLoaded = true
+        if (preloadedBlobURL) { URL.revokeObjectURL(preloadedBlobURL); preloadedBlobURL = null }
+        callback({ ok: true })
+      }
       else console.error('received unknown message from worker: ', e.data)
     }
 
     engineInstance.onerror = (err) => {
-      console.error('worker error: ' + err.message + '\nretrying after 0.5s...')
+      if (engineRetryCount >= MAX_ENGINE_RETRIES) {
+        console.error('[Engine] Max retries reached, giving up')
+        callback({ error: 'Engine failed after ' + MAX_ENGINE_RETRIES + ' retries' })
+        return
+      }
+      engineRetryCount++
+      console.error('[Engine] worker error: ' + err.message + ' retry ' + engineRetryCount + '/' + MAX_ENGINE_RETRIES)
       engineInstance.terminate()
       setTimeout(() => init(callback), 500)
     }
@@ -446,8 +470,14 @@ function stopThinking() {
 }
 
 // Send a command to engine
+const VALID_CMD_PREFIXES = ['YX', 'YXST', 'YXBO', 'YXPL', 'YXSW', 'YXIN', 'YXCO', 'YXLO', 'YXDA', 'YXBK', 'YXRP', 'YXMU']
 function sendCommand(cmd) {
   if (typeof cmd !== 'string' || cmd.length == 0) return
+  const upper = cmd.toUpperCase()
+  if (!VALID_CMD_PREFIXES.some(p => upper.startsWith(p))) {
+    console.warn('[Engine] Blocked invalid command:', cmd)
+    return
+  }
 
   if (supportThreads) engineInstance.sendCommand(cmd)
   else engineInstance.postMessage({ type: 'command', data: cmd })
@@ -537,6 +567,9 @@ function onEngineStderr(output) {
 
 function onEngineExit(code) {
   console.log('[Engine Exit] ' + code)
+  if (code !== 0 && callback) {
+    callback({ error: 'Engine exited (code: ' + code + ')' })
+  }
 }
 
 function onEngineStatus(status) {

@@ -94,6 +94,7 @@ const propertiesToSave = [
   'hashSize',
   'pondering',
   'clickCheck',
+  'indexOrigin',
   'showCoord',
   'showAnalysis',
   'showDetail',
@@ -153,12 +154,59 @@ function saveCookies() {
   localStorage.setItem('GMKC_CFG_' + version, JSON.stringify(stateToSave))
 }
 
+const ALLOWED_KEYS = new Set(propertiesToSave)
+
+// 每个字段允许的类型（用于值校验）
+const VALUE_TYPES = {
+  language: 'string',
+  autoPlayMode: 'boolean',
+  showAnalysisPanel: 'boolean',
+  boardSize: 'number',
+  thinkTimeOption: 'number',
+  turnTime: 'number',
+  matchTime: 'number',
+  maxDepth: 'number',
+  maxNodes: 'number',
+  rule: 'number',
+  threads: 'number',
+  strength: 'number',
+  nbest: 'number',
+  configIndex: 'number',
+  candRange: 'number',
+  hashSize: 'number',
+  pondering: 'boolean',
+  clickCheck: 'number',
+  showCoord: 'boolean',
+  showAnalysis: 'boolean',
+  showDetail: 'boolean',
+  showPvEval: 'number',
+  showIndex: 'boolean',
+  showLastStep: 'boolean',
+  showWinline: 'boolean',
+  showForbid: 'boolean',
+  aiThinkBlack: 'boolean',
+  aiThinkWhite: 'boolean',
+}
+
 const mutations = {
   setValue(state, payload) {
+    if (!ALLOWED_KEYS.has(payload.key)) return
+    // 类型校验
+    const expected = VALUE_TYPES[payload.key]
+    if (expected && typeof payload.value !== expected) {
+      console.warn('[Settings] Blocked value with wrong type:', payload.key, typeof payload.value, '!=', expected)
+      return
+    }
     state[payload.key] = payload.value
     if (propertiesToSave.includes(payload.key)) saveCookies()
   },
   setValueNoSave(state, payload) {
+    if (!ALLOWED_KEYS.has(payload.key)) return
+    const expected = VALUE_TYPES[payload.key]
+    if (expected && typeof payload.value !== expected) {
+      console.warn('[Settings] Blocked value with wrong type:', payload.key, typeof payload.value, '!=', expected)
+      return
+    }
     state[payload.key] = payload.value
   },
   // Toggle auto-play mode (Requirements: 4.1, 4.2, 4.3)

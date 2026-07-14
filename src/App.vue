@@ -33,14 +33,16 @@ function canShowInstallPrompt() {
 }
 
 function updateInstallPromptData() {
-  const today = new Date().toDateString();
-  const installData = JSON.parse(localStorage.getItem('pwaInstallPromptData')) || { lastShown: null, count: 0 };
-
-  if (installData.lastShown !== today) {
-    installData.lastShown = today;
-    installData.count += 1;
-    localStorage.setItem('pwaInstallPromptData', JSON.stringify(installData));
-  }
+  try {
+    const today = new Date().toDateString();
+    const raw = localStorage.getItem('pwaInstallPromptData');
+    const installData = (raw ? JSON.parse(raw) : null) || { lastShown: null, count: 0 };
+    if (installData.lastShown !== today) {
+      installData.lastShown = today;
+      installData.count = typeof installData.count === 'number' ? installData.count + 1 : 1;
+      localStorage.setItem('pwaInstallPromptData', JSON.stringify(installData));
+    }
+  } catch { /* ignore */ }
 }
 
 export default {
