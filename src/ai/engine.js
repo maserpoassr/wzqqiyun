@@ -470,14 +470,8 @@ function stopThinking() {
 }
 
 // Send a command to engine
-const VALID_CMD_PREFIXES = ['YX', 'YXST', 'YXBO', 'YXPL', 'YXSW', 'YXIN', 'YXCO', 'YXLO', 'YXDA', 'YXBK', 'YXRP', 'YXMU']
 function sendCommand(cmd) {
   if (typeof cmd !== 'string' || cmd.length == 0) return
-  const upper = cmd.toUpperCase()
-  if (!VALID_CMD_PREFIXES.some(p => upper.startsWith(p))) {
-    console.warn('[Engine] Blocked invalid command:', cmd)
-    return
-  }
 
   if (supportThreads) engineInstance.sendCommand(cmd)
   else engineInstance.postMessage({ type: 'command', data: cmd })
