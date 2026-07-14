@@ -86,6 +86,7 @@
     "white": "Quân trắng",
     "engineLoading": "Đang tải dữ liệu engine...",
     "engineLoadingError": "Tải động cơ thất bại, vui lòng làm mới và thử lại",
+    "engineLoadingErrorGeneric": "Không thể khởi động động cơ. Vui lòng kiểm tra kết nối mạng và làm mới",
     "copiedToClipboard": "Đã sao chép vào clipboard"
   },
   "setting": {

@@ -86,6 +86,7 @@
     "white": "WHITE",
     "engineLoading": "Downloading engine data...",
     "engineLoadingError": "Engine loading failed, please refresh and try again",
+    "engineLoadingErrorGeneric": "Engine failed to start. Please check your network and refresh",
     "copiedToClipboard": "Copied to clipboard"
   },
   "setting": {

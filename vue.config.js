@@ -19,7 +19,7 @@ module.exports = {
   },
 
   chainWebpack: (config) => {
-    // set worker-loader
+    // worker-loader for Web Workers
     config.module
       .rule('worker')
       .test(/\.worker\.js$/)
@@ -29,6 +29,17 @@ module.exports = {
 
     // 解决：worker 热更新问题
     config.module.rule('js').exclude.add(/\.worker\.js$/)
+
+    // Exclude large .data files from build (loaded from R2 CDN)
+    config.module
+      .rule('exclude-large-data')
+      .test(/\.data$/)
+      .use('file-loader')
+      .loader('file-loader')
+      .options({
+        name: 'build/[name].[ext]',
+        emitFile: false,
+      })
   },
 
   devServer: {
@@ -47,7 +58,7 @@ module.exports = {
     },
   },
 
-  publicPath: process.env.NODE_ENV === 'production' ? '/' : '/',
+  publicPath: '/',
 
   pwa: {
     name: 'Gomoku Calculator',
@@ -78,43 +89,41 @@ module.exports = {
       maskIcon: null,
     },
 
-    // configure the workbox plugin
     workboxPluginMode: 'GenerateSW',
     workboxOptions: {
       importWorkboxFrom: 'local',
       skipWaiting: true,
       clientsClaim: false,
-      offlineGoogleAnalytics: true,
+      offlineGoogleAnalytics: false,
       cleanupOutdatedCaches: true,
+      exclude: [/\.data$/, /\.map$/],
       runtimeCaching: [
         {
-          // match all resources except HTML files
           urlPattern: /^(?!.*\.html$).*$/,
           handler: 'CacheFirst',
           options: {
             cacheName: 'all-resources-cache',
             expiration: {
               maxEntries: 500,
-              maxAgeSeconds: 60 * 60 * 24 * 15, // 15天
-              purgeOnQuotaError: true
+              maxAgeSeconds: 60 * 60 * 24 * 15,
+              purgeOnQuotaError: true,
             },
             cacheableResponse: {
-              statuses: [0, 200]
-            }
-          }
+              statuses: [0, 200],
+            },
+          },
         },
         {
-          // HTML files use StaleWhileRevalidate strategy
           urlPattern: /\.html$/,
           handler: 'StaleWhileRevalidate',
           options: {
             cacheName: 'html-cache',
             cacheableResponse: {
-              statuses: [0, 200]
-            }
-          }
-        }
-      ]
+              statuses: [0, 200],
+            },
+          },
+        },
+      ],
     },
   },
 }

@@ -86,6 +86,7 @@
     "white": "白石",
     "engineLoading": "エンジンデータをダウンロード中...",
     "engineLoadingError": "エンジンの読み込みに失敗しました。リフレッシュして再試行してください",
+    "engineLoadingErrorGeneric": "エンジンを起動できませんでした。ネットワークを確認してリロードしてください",
     "copiedToClipboard": "クリップボードにコピーしました"
   },
   "setting": {

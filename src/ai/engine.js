@@ -13,12 +13,10 @@ const WASM_VARIANTS = [
   { name: 'rapfi-single', requiresThreads: false, requiresSIMD: false },
 ]
 
-// CDN 地址 - Cloudflare R2（免费出站流量）
-// 仅在生产环境使用，本地开发时禁用以避免 CORS 问题
-const CHINA_CDN_URL = process.env.NODE_ENV === 'production' ? 'https://cdn.hfive.ggff.net/' : null
+const CHINA_CDN_URL = 'https://pub-48ebff44fc3541d08f962a38d5a56563.r2.dev/'
 
 // 分块下载配置
-const DEFAULT_CHUNK_COUNT = 10 // 默认 10 线程并行下载
+const DEFAULT_CHUNK_COUNT = 20 // 默认 20 线程并行下载
 
 // 预下载的数据缓存
 let preloadedDataBuffer = null
@@ -300,10 +298,9 @@ async function init(callbackFn_, loadFullEngine) {
     relaxedSimd: supportRelaxedSIMD,
   })
 
-  // CDN 预加载只对支持线程的浏览器有效（主线程模式）
-  // Worker 模式（fallback）有自己的 locateFile，无法使用预加载的 buffer
-  if (loadFullEngine && CHINA_CDN_URL && supportThreads) {
-    console.log('[Engine] Starting CDN preload for rapfi.data (threads mode)...')
+  // 分块预加载 rapfi.data（多线程和 Worker 模式都生效）
+  if (loadFullEngine && CHINA_CDN_URL) {
+    console.log('[Engine] Starting CDN preload for rapfi.data...')
     try {
       await preloadRapfiData((loaded, total) => {
         callback({
@@ -320,7 +317,7 @@ async function init(callbackFn_, loadFullEngine) {
       preloadedDataBuffer = null
     }
   } else {
-    console.log('[Engine] Skipping CDN preload - loadFullEngine:', loadFullEngine, 'CHINA_CDN_URL:', CHINA_CDN_URL, 'supportThreads:', supportThreads)
+    console.log('[Engine] Skipping CDN preload - loadFullEngine:', loadFullEngine, 'CHINA_CDN_URL:', CHINA_CDN_URL)
   }
 
   console.log('[Engine] Browser capabilities:', {
@@ -391,15 +388,16 @@ async function init(callbackFn_, loadFullEngine) {
         setTimeout(() => init(callback), 500)
       }
 
-      // 使用 fallback 引擎
       const fallbackURL = `${process.env.BASE_URL}build/fallback/rapfi-single.js`
       engineInstance.postMessage({
         type: 'engineScriptURL',
         data: {
           engineURL: fallbackURL,
           memoryArgs: getWasmMemoryArguments(false),
+          cdnURL: CHINA_CDN_URL,
+          preloadedData: preloadedDataBuffer,
         },
-      })
+      }, preloadedDataBuffer ? [preloadedDataBuffer] : [])
     }
   } else {
     engineInstance = new Worker()
@@ -425,8 +423,10 @@ async function init(callbackFn_, loadFullEngine) {
       data: {
         engineURL: finalEngineURL,
         memoryArgs: getWasmMemoryArguments(false),
+        cdnURL: CHINA_CDN_URL,
+        preloadedData: preloadedDataBuffer,
       },
-    })
+    }, preloadedDataBuffer ? [preloadedDataBuffer] : [])
   }
 
   return finalEngineURL

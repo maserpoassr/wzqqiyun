@@ -188,10 +188,22 @@ const actions = {
     let json = localStorage.getItem('GMKC_CFG_' + version)
     if (!json) return
 
-    let stateToRead = JSON.parse(json)
-    for (let p of propertiesToSave) commit('setValueNoSave', { key: p, value: stateToRead[p] })
-    for (let p of boardPropertiesToSave)
-      commit('setBoardStyleNoSave', { key: p, value: stateToRead[p] })
+    let stateToRead
+    try {
+      stateToRead = JSON.parse(json)
+    } catch {
+      return // 非法 JSON 直接忽略
+    }
+    if (typeof stateToRead !== 'object' || stateToRead === null) return
+
+    for (let p of propertiesToSave) {
+      if (Object.prototype.hasOwnProperty.call(stateToRead, p))
+        commit('setValueNoSave', { key: p, value: stateToRead[p] })
+    }
+    for (let p of boardPropertiesToSave) {
+      if (Object.prototype.hasOwnProperty.call(stateToRead, p))
+        commit('setBoardStyleNoSave', { key: p, value: stateToRead[p] })
+    }
   },
   clearCookies() {
     localStorage.removeItem('GMKC_CFG_' + version)

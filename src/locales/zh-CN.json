@@ -86,6 +86,7 @@
     "white": "白棋",
     "engineLoading": "下载引擎数据中...",
     "engineLoadingError": "加载引擎失败，请刷新重试",
+    "engineLoadingErrorGeneric": "引擎暂时无法启动，请检查网络连接后刷新页面",
     "copiedToClipboard": "已复制到剪贴板"
   },
   "setting": {

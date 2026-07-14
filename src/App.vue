@@ -18,22 +18,18 @@ import { mapState, mapMutations, mapActions } from 'vuex'
 import { register } from 'register-service-worker'
 
 function canShowInstallPrompt() {
-  const installData = JSON.parse(localStorage.getItem('pwaInstallPromptData'));
-  if (!installData)
-    return true;
-
-  const { lastShown, count } = installData;
-  const today = new Date().toDateString();
-
-  if (count >= 5) {
-    return false;
+  try {
+    const raw = localStorage.getItem('pwaInstallPromptData')
+    if (!raw) return true
+    const installData = JSON.parse(raw)
+    const count = Number.isInteger(installData.count) ? installData.count : 0
+    const today = new Date().toDateString()
+    if (count >= 5) return false
+    if (installData.lastShown === today) return false
+    return true
+  } catch {
+    return true
   }
-
-  if (lastShown === today) {
-    return false;
-  }
-
-  return true;
 }
 
 function updateInstallPromptData() {
@@ -125,13 +121,17 @@ export default {
           _this.initEngine(false).catch((err2) => {
             _this.$vux.alert.show_i18n({
               title: _this.$t('game.engineLoadingError'),
-              content: err2.toString(),
+              content: process.env.NODE_ENV === 'production'
+                ? _this.$t('game.engineLoadingErrorGeneric')
+                : err2.toString(),
             })
           })
         } else {
           _this.$vux.alert.show_i18n({
             title: _this.$t('game.engineLoadingError'),
-            content: err.toString(),
+            content: process.env.NODE_ENV === 'production'
+              ? _this.$t('game.engineLoadingErrorGeneric')
+              : err.toString(),
           })
         }
       })
