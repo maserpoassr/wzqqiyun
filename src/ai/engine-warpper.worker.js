@@ -31,6 +31,6 @@ self.onmessage = function (e) {
       wasmMemory: memoryArgs ? new WebAssembly.Memory(memoryArgs) : undefined,
     }).then((instance) => ((EngineInstance = instance), self.postMessage({ type: 'ready' })))
   } else {
-    console.error('worker received unknown payload: ' + e.data)
+    console.error('worker received unknown payload: ' + e.data) // eslint-disable-line no-console
   }
 }
